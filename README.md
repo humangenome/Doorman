@@ -5,7 +5,8 @@
 [![Needs](https://img.shields.io/badge/Needs-S1DedicatedServers_1.1.1-f3efc4.svg)](https://github.com/ifBars/S1DedicatedServers)
 
 A Schedule I dedicated server sits at full speed all day with nobody on it, and anyone who has
-the address can join, because the mod does not check the server password. Doorman is a small
+the address can join, because S1DedicatedServers 1.1.1 does not check the server password when
+a player joins. Doorman is a small
 server add-on for [S1DedicatedServers](https://github.com/ifBars/S1DedicatedServers) that fixes
 both: an idle saver that cuts the empty server's processor use, an invited-players-only list
 (an allow list, or whitelist, checked against the Steam ID Steam confirmed), and a live status
