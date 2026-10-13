@@ -1,0 +1,22 @@
+Doorman
+
+A server-side add-on for Schedule I dedicated servers running S1DedicatedServers.
+It runs on the server only. Players do not install it.
+
+Source code: https://github.com/HumanGenome/Doorman
+
+Copyright (C) 2026 HumanGenome
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details:
+https://www.gnu.org/licenses/gpl-3.0.txt
+
+It is built against, and loaded by, S1DedicatedServers
+(https://github.com/ifBars/S1DedicatedServers), which is licensed under the
+GNU General Public License version 3.

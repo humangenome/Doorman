@@ -1,0 +1,10 @@
+# build output
+bin/
+obj/
+dist/
+# this machine's path to the game files
+local.build.props
+# the game's and the mod's own assemblies never go in this repository
+*.dll
+*.pdb
+lib/

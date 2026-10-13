@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Where this machine keeps the game's and the mod's own assemblies (never in this repository). -->
+  <Import Project="..\..\local.build.props" Condition="Exists('..\..\local.build.props')" />
+
+  <PropertyGroup>
+    <!-- The IL2CPP game runs mods on MelonLoader's .NET 6 runtime, the same target the mod itself uses. -->
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>Doorman</AssemblyName>
+    <RootNamespace>Doorman</RootNamespace>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <Company>HumanGenome</Company>
+    <Product>Doorman</Product>
+    <Copyright>Copyright (C) 2026 HumanGenome. GPL-3.0-or-later.</Copyright>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>10.0</LangVersion>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <Target Name="NeedGameFiles" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(S1GameFiles)' == '' Or !Exists('$(S1GameFiles)/Mods/DedicatedServerMod_Il2cpp_Server.dll')"
+           Text="Set S1GameFiles in local.build.props to a folder holding MelonLoader/net6, MelonLoader/Il2CppAssemblies and Mods/DedicatedServerMod_Il2cpp_Server.dll copied from a Schedule I game server (see README, 'Building')." />
+  </Target>
+
+  <!-- Compile-time references only. Nothing here is copied to the output or shipped. -->
+  <ItemGroup>
+    <Reference Include="MelonLoader">
+      <HintPath>$(S1GameFiles)/MelonLoader/net6/MelonLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppInterop.Runtime">
+      <HintPath>$(S1GameFiles)/MelonLoader/net6/Il2CppInterop.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppInterop.Common">
+      <HintPath>$(S1GameFiles)/MelonLoader/net6/Il2CppInterop.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2Cppmscorlib">
+      <HintPath>$(S1GameFiles)/MelonLoader/Il2CppAssemblies/Il2Cppmscorlib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppSystem.Core">
+      <HintPath>$(S1GameFiles)/MelonLoader/Il2CppAssemblies/Il2CppSystem.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(S1GameFiles)/MelonLoader/Il2CppAssemblies/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Il2CppFishNet.Runtime">
+      <HintPath>$(S1GameFiles)/MelonLoader/Il2CppAssemblies/Il2CppFishNet.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(S1GameFiles)/MelonLoader/Il2CppAssemblies/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="DedicatedServerMod_Il2cpp_Server">
+      <HintPath>$(S1GameFiles)/Mods/DedicatedServerMod_Il2cpp_Server.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+<Project>
+  <!-- Copy to local.build.props (git-ignored) and point it at this machine's copy of the game files.
+       The folder holds three things copied from a Schedule I game server's own folder:
+         MelonLoader/net6/               MelonLoader and Il2CppInterop
+         MelonLoader/Il2CppAssemblies/   the assemblies MelonLoader generates from the game
+         Mods/DedicatedServerMod_Il2cpp_Server.dll   the S1DedicatedServers mod, server build
+       They belong to the game and the mod. They are never committed, uploaded or published. -->
+  <PropertyGroup>
+    <S1GameFiles>/path/to/game-il2cpp</S1GameFiles>
+  </PropertyGroup>
+</Project>
