@@ -96,7 +96,7 @@ file that grows, and the disk write happens off the game thread. A reader should
 whose `written` time is more than about 30 seconds old as "not running".
 
 ```json
-{"format":1,"addon":"1.0.0","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
+{"format":1,"addon":"1.0.1","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
  "ready":"2026-10-09T18:36:17Z",
  "clock":{"available":true,"day":1,"hour":7,"minute":0,"time":"07:00"},
  "lastSave":{"files":"2026-10-09T18:35:58Z","reported":null},
