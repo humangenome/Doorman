@@ -7,10 +7,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>Doorman</AssemblyName>
     <RootNamespace>Doorman</RootNamespace>
-    <Version>1.0.1</Version>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
-    <InformationalVersion>1.0.1</InformationalVersion>
+    <Version>1.0.2</Version>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
+    <InformationalVersion>1.0.2</InformationalVersion>
     <Company>HumanGenome</Company>
     <Product>Doorman</Product>
     <Copyright>Copyright (C) 2026 HumanGenome. GPL-3.0-or-later.</Copyright>

@@ -30,7 +30,7 @@ namespace Doorman
     /// </summary>
     public sealed class DoormanMod : ServerMelonModBase
     {
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
 
         private const string SettingsFileName = "Doorman.json";
         private const string FeedFileName = "Doorman.live.json";
