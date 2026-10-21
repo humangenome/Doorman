@@ -35,6 +35,11 @@ Measured on one server with nobody connected (processor time of the game process
 seconds): 1.35 to 1.45 cores without Doorman, 0.52 with the idle saver at 10 frames a second,
 and 0.25 at 2.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/idle-saver-dark.png">
+  <img src="docs/img/idle-saver-light.png" alt="Bar chart: processor use of an empty Schedule I server, 1.35 to 1.45 cores without Doorman, 0.52 with the idle saver at 10 frames a second, 0.25 at 2" width="800">
+</picture>
+
 ## What you need
 
 - A Schedule I dedicated server on S1DedicatedServers **1.1.2**, the IL2CPP server build, with
