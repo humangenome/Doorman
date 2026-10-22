@@ -1,0 +1,39 @@
+name: Tests
+
+# Doorman's own logic (the settings reader, the invited-list decision, the idle rule and the
+# feed text), checked on every push and pull request. The test project compiles
+# src/Doorman/Core only, so no game, MelonLoader or mod files are needed here; building the
+# add-on itself still needs them and stays a local step (README, "Building").
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # build.sh refuses to pack when these two disagree; say so on the pull request instead
+      - name: Version strings agree
+        run: |
+          v=$(grep -oP 'public const string Version = "\K[^"]+' src/Doorman/DoormanMod.cs)
+          p=$(grep -oP '<Version>\K[^<]+' src/Doorman/Doorman.csproj)
+          if [ -z "$v" ] || [ "$v" != "$p" ]; then
+            echo "::error::DoormanMod.cs says '$v', Doorman.csproj says '$p'"
+            exit 1
+          fi
+          echo "version $v"
+
+      - name: Unit checks
+        run: dotnet run --project tests/Doorman.Tests -c Release
