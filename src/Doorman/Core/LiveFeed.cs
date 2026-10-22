@@ -52,6 +52,14 @@ namespace Doorman.Core
         public double MeasuredFrameRate = -1d;
 
         public bool InvitedOnlyOn;
+
+        /// <summary>
+        /// True while invited players only is on AND its check is running. False when it is off, or
+        /// when the check keeps failing or has nothing to look at (the log says why): a reader must
+        /// not trust "on" alone to mean players are being checked.
+        /// </summary>
+        public bool InvitedChecking;
+
         public int InvitedCount;
     }
 
@@ -145,6 +153,7 @@ namespace Doorman.Core
 
                     w.WriteStartObject("invitedOnly");
                     w.WriteBoolean("on", s.InvitedOnlyOn);
+                    w.WriteBoolean("checking", s.InvitedOnlyOn && s.InvitedChecking);
                     w.WriteNumber("listed", s.InvitedCount);
                     w.WriteEndObject();
 

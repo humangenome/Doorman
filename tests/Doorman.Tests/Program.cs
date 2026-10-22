@@ -5,7 +5,7 @@ using System.Text.Json;
 using Doorman.Core;
 
 // The add-on's logic, checked without a game. Nobody may join the test game server, so the
-// invited-list decision, the idle rule and the settings reader are proven here.
+// invited-list decision, the idle rule, the settings reader and the failure lines are proven here.
 // Run: dotnet run --project tests/Doorman.Tests   (exits 1 on any failure)
 internal static class Program
 {
@@ -30,6 +30,7 @@ internal static class Program
         Invites();
         Idle();
         Feed();
+        Steps();
 
         if (Failures.Count > 0)
         {
@@ -323,7 +324,7 @@ internal static class Program
             + "\"lastSave\":{\"files\":\"2026-10-09T19:27:05Z\",\"reported\":null},"
             + "\"playerCount\":0,\"maxPlayers\":16,\"players\":[],"
             + "\"frameRate\":{\"idleSaver\":true,\"idleNow\":true,\"idleLimit\":10,\"normalLimit\":60,\"measured\":10},"
-            + "\"invitedOnly\":{\"on\":false,\"listed\":0}}";
+            + "\"invitedOnly\":{\"on\":false,\"checking\":false,\"listed\":0}}";
         Check("feed: nobody connected, exact text", json == expected, json);
 
         FeedSnapshot two = new FeedSnapshot { AddonVersion = "1.0.0", WrittenUtc = written, MaxPlayers = 16, NormalFrameRate = 60, IdleFrameRate = 10, InvitedOnlyOn = true, InvitedCount = 3 };
@@ -350,6 +351,20 @@ internal static class Program
             Check("feed: not measured yet is null", root.GetProperty("frameRate").GetProperty("measured").ValueKind == JsonValueKind.Null);
             Check("feed: ready not known is null", root.GetProperty("ready").ValueKind == JsonValueKind.Null);
             Check("feed: invited only shows the switch and the size of the list, never the list", root.GetProperty("invitedOnly").GetProperty("on").GetBoolean() && root.GetProperty("invitedOnly").GetProperty("listed").GetInt32() == 3 && !text.Contains("steamIds"));
+            Check("feed: on, but the check has not run, is not checking", !root.GetProperty("invitedOnly").GetProperty("checking").GetBoolean());
+        }
+
+        two.InvitedChecking = true;
+        using (JsonDocument doc = JsonDocument.Parse(LiveFeed.ToJson(two)))
+        {
+            JsonElement invited = doc.RootElement.GetProperty("invitedOnly");
+            Check("feed: on and the check running is checking", invited.GetProperty("on").GetBoolean() && invited.GetProperty("checking").GetBoolean());
+        }
+
+        two.InvitedOnlyOn = false;
+        using (JsonDocument doc = JsonDocument.Parse(LiveFeed.ToJson(two)))
+        {
+            Check("feed: switched off is never checking, whatever the step last did", !doc.RootElement.GetProperty("invitedOnly").GetProperty("checking").GetBoolean());
         }
 
         Check("feed: one line, no growth with time", !json.Contains("\n") && LiveFeed.ToJson(empty).Length == json.Length);
@@ -391,5 +406,92 @@ internal static class Program
         {
             try { Directory.Delete(folder, true); } catch (IOException) { }
         }
+    }
+
+    // ---- failure lines (each step on its own; the log says what fails without filling up)
+
+    private static void Steps()
+    {
+        double t = 0d;
+        StepHealth step = new StepHealth("invite check", () => t);
+
+        Check("step: a step that never failed says nothing when it works", step.Succeeded() == null && !step.Failing);
+        Check("step: worked just now", step.WorkedWithin(5d));
+        t = 6d;
+        Check("step: worked, but not within the window", !step.WorkedWithin(5d));
+        step.Succeeded();
+
+        string first = step.Failed(new InvalidOperationException("Clients is gone"));
+        Check("step: the first failure is said at once, with the exception", first == "Invite check failed, and is tried again each time: InvalidOperationException: Clients is gone.", first);
+        Check("step: failing, so not working within any window", step.Failing && !step.WorkedWithin(1000d) && step.FailuresInARow == 1);
+
+        // the same failure four times a second for almost five minutes: no more lines
+        int lines = 0;
+        for (int i = 1; i < 1199; i++)
+        {
+            t = 6d + i * 0.25d;
+            if (step.Failed(new InvalidOperationException("Clients is gone")) != null)
+            {
+                lines++;
+            }
+        }
+
+        Check("step: the same failure again is only counted", lines == 0 && step.FailuresInARow == 1199, lines.ToString());
+        t = 306d;
+        string again = step.Failed(new InvalidOperationException("Clients is gone"));
+        Check("step: five minutes on it is said again, with a count", again == "Invite check is still failing (1198 failures since the last line): InvalidOperationException: Clients is gone.", again);
+        t = 307d;
+        Check("step: and then quiet again", step.Failed(new InvalidOperationException("Clients is gone")) == null);
+
+        // a different failure: said, but never two lines within 10 seconds
+        t = 310d;
+        Check("step: a new kind inside 10 seconds of the last line waits", step.Failed(new NullReferenceException("Object reference not set")) == null);
+        t = 316.5d;
+        string newer = step.Failed(new NullReferenceException("Object reference not set"));
+        Check("step: a new kind is said once the 10 seconds are up", newer == "Invite check failed in a new way (2 failures since the last line): NullReferenceException: Object reference not set.", newer);
+        t = 330d;
+        Check("step: flipping back to a kind already said is only counted", step.Failed(new InvalidOperationException("Clients is gone")) == null && step.Failed(new NullReferenceException("Object reference not set")) == null);
+
+        // works again
+        t = 331d;
+        string back = step.Succeeded();
+        Check("step: one line when it works again", back == "Invite check is working again after 1205 failures.", back);
+        Check("step: and it is working", !step.Failing && step.FailuresInARow == 0 && step.WorkedWithin(5d));
+        Check("step: no second working line", step.Succeeded() == null);
+        t = 332d;
+        string relapse = step.Failed(new InvalidOperationException("Clients is gone"));
+        Check("step: after working, the old failure is a first failure again", relapse != null && relapse.StartsWith("Invite check failed, and is tried again each time: "), relapse);
+        step.Succeeded();
+
+        // a message that changes every time (an index, a name) cannot fill the log
+        StepHealth noisy = new StepHealth("player count", () => t);
+        int noisyLines = 0;
+        for (int i = 0; i < 5000; i++)
+        {
+            t = 1000d + i;
+            if (noisy.Failed(new ArgumentOutOfRangeException("index", "Index " + i + " was out of range")) != null)
+            {
+                noisyLines++;
+            }
+        }
+
+        Check("step: changing messages give at most 16 kinds, then a line every five minutes", noisyLines <= StepHealth.MaxKinds + (int)(5000 / StepHealth.RepeatSeconds) + 1, noisyLines.ToString());
+        Check("step: and still at least the first", noisyLines >= 1);
+
+        // what a line carries
+        StepHealth plain = new StepHealth("writing the live feed file", () => t);
+        string reason = plain.Failed(null, "Doorman.live.json could not be written five times in a row");
+        Check("step: a plain reason without an exception type", reason == "Writing the live feed file failed, and is tried again each time: Doorman.live.json could not be written five times in a row.", reason);
+        plain.Succeeded();
+        string odd = plain.Failed("IOException", "line one\nline two\t\r  end");
+        Check("step: one line, whatever the message holds", odd == "Writing the live feed file failed, and is tried again each time: IOException: line one line two end.", odd);
+        plain.Succeeded();
+        string longOne = plain.Failed("IOException", new string('x', 1000));
+        Check("step: a long message is cut", longOne.Length < StepHealth.MaxDetail + 100, longOne.Length.ToString());
+        plain.Succeeded();
+        Check("step: nothing at all to say still says something", plain.Failed((Exception)null) == "Writing the live feed file failed, and is tried again each time: no reason given.");
+        bool threw = false;
+        try { new StepHealth("x", null); } catch (ArgumentNullException) { threw = true; }
+        Check("step: a missing clock is refused", threw);
     }
 }

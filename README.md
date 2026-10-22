@@ -101,14 +101,14 @@ file that grows, and the disk write happens off the game thread. A reader should
 whose `written` time is more than about 30 seconds old as "not running".
 
 ```json
-{"format":1,"addon":"1.0.2","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
+{"format":1,"addon":"1.0.3","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
  "ready":"2026-10-09T18:36:17Z",
  "clock":{"available":true,"day":1,"hour":7,"minute":0,"time":"07:00"},
  "lastSave":{"files":"2026-10-09T18:35:58Z","reported":null},
  "playerCount":0,"maxPlayers":16,
  "players":[{"name":"...","steamId":"7656119...","connected":"...Z","seconds":125,"joined":true,"x":-12.3,"z":45.7}],
  "frameRate":{"idleSaver":true,"idleNow":true,"idleLimit":10,"normalLimit":60,"measured":9.9},
- "invitedOnly":{"on":false,"listed":0}}
+ "invitedOnly":{"on":false,"checking":false,"listed":0}}
 ```
 
 - `lastSave.files` is the newest write time among the save folder's own top-level files, so it
@@ -118,6 +118,9 @@ whose `written` time is more than about 30 seconds old as "not running".
   the player's character exists.
 - `frameRate.measured` is the frames actually counted since the previous write.
 - The feed says how many IDs are on the invited list, never the list itself.
+- `invitedOnly.checking` is true only while the list is on and its check is running. If the check
+  fails, or the mod has no player list to look at, it turns false and the log says why, so
+  a reader should not take `on` alone to mean players are being checked.
 
 **Invited players only.** Checked four times a second for every connection the mod lists, with
 one decision per connection: a later change to the list does not remove somebody who is already
@@ -142,7 +145,7 @@ follows the game's clock and saves, a save at idle brings the server back to ful
 setting change applies within 5 seconds without a restart, a stop at 2 frames a second still
 saves the world first, and a network-level connection brought the server back to full speed
 13 milliseconds after it opened (`tools/ConnectProbe`, below). The settings reader, the invited-list decision, the
-idle rule and the feed are covered by 140 unit checks.
+idle rule, the feed and the failure lines are covered by 165 unit checks.
 
 Not yet tested with a real player joining: a full join with the idle saver on, invited-only
 turning the right person away and letting an invited one in, and the positions in the feed.

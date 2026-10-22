@@ -30,10 +30,16 @@ namespace Doorman
     /// </summary>
     public sealed class DoormanMod : ServerMelonModBase
     {
-        public const string Version = "1.0.2";
+        public const string Version = "1.0.3";
 
         private const string SettingsFileName = "Doorman.json";
         private const string FeedFileName = "Doorman.live.json";
+
+        // the feed says invited players only is checking while the check has run this recently
+        // (it runs four times a second, and always before the feed in the same frame)
+        private const double InviteCheckingWindowSeconds = 5d;
+
+        private const string InviteNote = " Until it works again nobody who joins is checked against the invited list, and the live feed says so.";
 
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private readonly Stopwatch _frame = Stopwatch.StartNew();
@@ -42,6 +48,11 @@ namespace Doorman
         private readonly List<string> _inviteSeen = new List<string>();
 
         private IdlePolicy _idle;
+        private StepHealth _settingsStep;
+        private StepHealth _countStep;
+        private StepHealth _inviteStep;
+        private StepHealth _feedStep;
+        private StepHealth _feedFileStep;
         private AddonConfig _config = AddonConfig.Defaults();
         private string _settingsPath;
         private string _feedPath;
@@ -60,15 +71,20 @@ namespace Doorman
         private double _nextFeed;
         private double _nextInviteCheck;
         private double _lastFeedAt = -1d;
+        private double _noPlayerListSince = -1d;
         private long _framesSinceFeed;
         private int _feedWriting;
         private int _feedFailures;
-        private bool _feedFailureLogged;
-        private bool _updateErrorLogged;
 
         public override void OnInitializeMelon()
         {
-            _idle = new IdlePolicy(() => _clock.Elapsed.TotalSeconds);
+            Func<double> now = () => _clock.Elapsed.TotalSeconds;
+            _idle = new IdlePolicy(now);
+            _settingsStep = new StepHealth("settings check", now);
+            _countStep = new StepHealth("player count", now);
+            _inviteStep = new StepHealth("invite check", now);
+            _feedStep = new StepHealth("live feed", now);
+            _feedFileStep = new StepHealth("writing the live feed file", now);
             _settingsPath = Path.Combine(MelonEnvironment.UserDataDirectory, SettingsFileName);
             _feedPath = Path.Combine(MelonEnvironment.UserDataDirectory, FeedFileName);
             LoadSettings(true);
@@ -126,39 +142,108 @@ namespace Doorman
             _framesSinceFeed++;
             double now = _clock.Elapsed.TotalSeconds;
 
-            try
+            // Each step is tried on its own: one that keeps failing (after a mod update changes
+            // something it reads, say) never stops the others, and each says so in the log.
+            if (now >= _nextSettingsCheck)
             {
-                if (now >= _nextSettingsCheck)
+                _nextSettingsCheck = now + 5d;
+                try
                 {
-                    _nextSettingsCheck = now + 5d;
                     LoadSettings(false);
+                    Report(_settingsStep, _settingsStep.Succeeded(), false);
                 }
-
-                if (now >= _nextConnectionCount)
+                catch (Exception ex)
                 {
-                    _nextConnectionCount = now + 1d;
-                    CountConnections();
-                }
-
-                if (_config.InvitedOnlyEnabled && now >= _nextInviteCheck)
-                {
-                    _nextInviteCheck = now + 0.25d;
-                    CheckInvites(now);
-                }
-
-                if (_config.LiveFeedEnabled && now >= _nextFeed)
-                {
-                    _nextFeed = now + _config.LiveFeedIntervalSeconds;
-                    WriteFeed(now);
+                    Report(_settingsStep, _settingsStep.Failed(ex), true);
                 }
             }
-            catch (Exception ex)
+
+            if (now >= _nextConnectionCount)
             {
-                if (!_updateErrorLogged)
+                _nextConnectionCount = now + 1d;
+                try
                 {
-                    _updateErrorLogged = true;
-                    LoggerInstance.Warning("A step failed and will be tried again quietly: " + ex.GetType().Name + ": " + ex.Message);
+                    CountConnections();
+                    Report(_countStep, _countStep.Succeeded(), false);
                 }
+                catch (Exception ex)
+                {
+                    // not knowing who is on means full speed until a count works again
+                    try
+                    {
+                        _idle.ConnectionStarted();
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    Report(_countStep, _countStep.Failed(ex), true, " Until it works again the idle saver keeps the server at full speed.");
+                }
+            }
+
+            if (_config.InvitedOnlyEnabled && now >= _nextInviteCheck)
+            {
+                _nextInviteCheck = now + 0.25d;
+                try
+                {
+                    if (CheckInvites(now))
+                    {
+                        _noPlayerListSince = -1d;
+                        Report(_inviteStep, _inviteStep.Succeeded(), false);
+                    }
+                    else if (_noPlayerListSince < 0d)
+                    {
+                        // the mod has no player list to look at: nothing was checked, and the feed
+                        // says so at once; the log waits a little in case it is only a slow start
+                        _noPlayerListSince = now;
+                    }
+                    else if (now - _noPlayerListSince >= 10d)
+                    {
+                        Report(_inviteStep, _inviteStep.Failed(null, "the dedicated server mod has had no player list for 10 seconds"), true, InviteNote);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Report(_inviteStep, _inviteStep.Failed(ex), true, InviteNote);
+                }
+            }
+
+            if (_config.LiveFeedEnabled && now >= _nextFeed)
+            {
+                _nextFeed = now + _config.LiveFeedIntervalSeconds;
+                try
+                {
+                    WriteFeed(now);
+                    Report(_feedStep, _feedStep.Succeeded(), false);
+                }
+                catch (Exception ex)
+                {
+                    Report(_feedStep, _feedStep.Failed(ex), true);
+                }
+            }
+        }
+
+        // One line from a step's health, if it has one to say. The note goes on the first failure's line only.
+        private void Report(StepHealth step, string line, bool warning, string firstFailureNote = null)
+        {
+            if (line == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (warning)
+                {
+                    LoggerInstance.Warning(firstFailureNote != null && step.FailuresInARow == 1 ? line + firstFailureNote : line);
+                }
+                else
+                {
+                    LoggerInstance.Msg(line);
+                }
+            }
+            catch (Exception)
+            {
             }
         }
 
@@ -305,6 +390,7 @@ namespace Doorman
             if (!_config.InvitedOnlyEnabled)
             {
                 _inviteDecided.Clear();
+                _noPlayerListSince = -1d;
             }
 
             if (!_config.LiveFeedEnabled)
@@ -445,12 +531,13 @@ namespace Doorman
 
         // ---- invited players only
 
-        private void CheckInvites(double now)
+        // True when every connected player was looked at; false when the mod has no player list yet.
+        private bool CheckInvites(double now)
         {
             PlayerManager players = S1DS.Server.Players;
             if (players == null)
             {
-                return;
+                return false;
             }
 
             IReadOnlyList<ConnectedPlayerInfo> connected = players.GetConnectedPlayers();
@@ -519,6 +606,8 @@ namespace Doorman
                     _inviteDecided.Remove(key);
                 }
             }
+
+            return true;
         }
 
         // ---- live feed
@@ -535,6 +624,7 @@ namespace Doorman
                 IdleNow = !_idleBroken && _idle.IsIdle,
                 IdleFrameRate = _config.IdleFrameRate,
                 InvitedOnlyOn = _config.InvitedOnlyEnabled,
+                InvitedChecking = _config.InvitedOnlyEnabled && _inviteStep.WorkedWithin(InviteCheckingWindowSeconds),
                 InvitedCount = _config.InvitedSteamIds.Count
             };
 
@@ -626,7 +716,7 @@ namespace Doorman
             }
 
             string feedPath = _feedPath;
-            ThreadPool.QueueUserWorkItem(_ =>
+            WaitCallback write = _ =>
             {
                 try
                 {
@@ -648,12 +738,29 @@ namespace Doorman
                 {
                     Interlocked.Exchange(ref _feedWriting, 0);
                 }
-            });
+            };
 
-            if (!_feedFailureLogged && Volatile.Read(ref _feedFailures) >= 5)
+            try
             {
-                _feedFailureLogged = true;
-                LoggerInstance.Warning("Live feed: the file could not be written five times in a row (" + FeedFileName + "). Still trying, quietly.");
+                ThreadPool.QueueUserWorkItem(write);
+            }
+            catch (Exception)
+            {
+                // never queued: free the slot, or no feed would ever be written again
+                Interlocked.Exchange(ref _feedWriting, 0);
+                throw;
+            }
+
+            // the disk side, from the writes that have finished: five misses in a row is a failure
+            // worth a line (repeated every few minutes while it lasts), one good write is the end of it
+            int misses = Volatile.Read(ref _feedFailures);
+            if (misses >= 5)
+            {
+                Report(_feedFileStep, _feedFileStep.Failed(null, FeedFileName + " could not be written five times in a row"), true);
+            }
+            else if (misses == 0)
+            {
+                Report(_feedFileStep, _feedFileStep.Succeeded(), false);
             }
         }
     }
