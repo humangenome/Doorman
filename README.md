@@ -2,10 +2,10 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Game](https://img.shields.io/badge/Game-Schedule_I-8fd06a.svg)](https://store.steampowered.com/app/3164500/)
-[![Needs](https://img.shields.io/badge/Needs-S1DedicatedServers_1.1.4-f3efc4.svg)](https://github.com/ifBars/S1DedicatedServers)
+[![Needs](https://img.shields.io/badge/Needs-S1DedicatedServers_1.1.5-f3efc4.svg)](https://github.com/ifBars/S1DedicatedServers)
 
 A Schedule I dedicated server sits at full speed all day with nobody on it, and anyone who has
-the address can join, because S1DedicatedServers 1.1.4 does not check the server password when
+the address can join, because S1DedicatedServers 1.1.5 does not check the server password when
 a player joins. Doorman is a small
 server add-on for [S1DedicatedServers](https://github.com/ifBars/S1DedicatedServers) that fixes
 both: an idle saver that cuts the empty server's processor use, an invited-players-only list
@@ -42,7 +42,7 @@ and 0.25 at 2.
 
 ## What you need
 
-- A Schedule I dedicated server on S1DedicatedServers **1.1.4**, the IL2CPP server build, with
+- A Schedule I dedicated server on S1DedicatedServers **1.1.5**, the IL2CPP server build, with
   MelonLoader 0.7.2.
 - Schedule I **0.4.7f12**. Doorman is built against one game build and one mod release; after
   either changes, rebuild it (see "Building").
