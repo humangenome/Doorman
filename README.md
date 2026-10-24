@@ -105,11 +105,15 @@ whose `written` time is more than about 30 seconds old as "not running".
  "ready":"2026-10-09T18:36:17Z",
  "clock":{"available":true,"day":1,"hour":7,"minute":0,"time":"07:00"},
  "lastSave":{"files":"2026-10-09T18:35:58Z","reported":null},
- "playerCount":0,"maxPlayers":16,
- "players":[{"name":"...","steamId":"7656119...","connected":"...Z","seconds":125,"joined":true,"x":-12.3,"z":45.7}],
- "frameRate":{"idleSaver":true,"idleNow":true,"idleLimit":10,"normalLimit":60,"measured":9.9},
- "invitedOnly":{"on":false,"checking":false,"listed":0}}
+ "playerCount":1,"maxPlayers":16,
+ "players":[{"name":"Player","steamId":"76561198000000001","connected":"2026-10-09T18:36:33Z","seconds":95,"joined":true,"x":-12.3,"z":45.7}],
+ "frameRate":{"idleSaver":true,"idleNow":false,"idleLimit":10,"normalLimit":60,"measured":59.9},
+ "invitedOnly":{"on":true,"checking":true,"listed":1}}
 ```
+
+That is one player connected and on the invited list. With nobody connected, `players` is
+`[]`, and once the quiet stretch has passed `idleNow` turns true and `measured` drops to about
+the idle limit.
 
 - `lastSave.files` is the newest write time among the save folder's own top-level files, so it
   is right across restarts. `lastSave.reported` is when the mod last told add-ons that a save
