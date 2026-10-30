@@ -30,7 +30,7 @@ namespace Doorman
     /// </summary>
     public sealed class DoormanMod : ServerMelonModBase
     {
-        public const string Version = "1.0.3";
+        public const string Version = "1.0.4";
 
         private const string SettingsFileName = "Doorman.json";
         private const string FeedFileName = "Doorman.live.json";
@@ -44,8 +44,7 @@ namespace Doorman
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private readonly Stopwatch _frame = Stopwatch.StartNew();
         private readonly HashSet<int> _startedConnections = new HashSet<int>();
-        private readonly Dictionary<string, double> _inviteDecided = new Dictionary<string, double>(StringComparer.Ordinal);
-        private readonly List<string> _inviteSeen = new List<string>();
+        private readonly InviteBook _inviteBook = new InviteBook();
 
         private IdlePolicy _idle;
         private StepHealth _settingsStep;
@@ -63,6 +62,7 @@ namespace Doorman
         private bool _connectionHooked;
         private bool _idleBroken;
         private bool _wasIdle;
+        private bool _saidNoSteamCheck;
         private DateTime? _readyUtc;
         private DateTime? _saveReportedUtc;
 
@@ -389,7 +389,7 @@ namespace Doorman
 
             if (!_config.InvitedOnlyEnabled)
             {
-                _inviteDecided.Clear();
+                _inviteBook.Clear();
                 _noPlayerListSince = -1d;
             }
 
@@ -541,9 +541,14 @@ namespace Doorman
             }
 
             IReadOnlyList<ConnectedPlayerInfo> connected = players.GetConnectedPlayers();
-            _inviteSeen.Clear();
-            bool serverConfirms = ServerConfig.Instance != null && ServerConfig.Instance.AuthenticationEnabled;
+            bool serverConfirms = ServerConfirmsIdentity();
+            if (!serverConfirms && !_saidNoSteamCheck)
+            {
+                _saidNoSteamCheck = true;
+                LoggerInstance.Warning("Invited players only: the mod's Steam authentication is off, so the list can only go by the ID a player's own game reports, and a player can fake that. Set authProvider to SteamGameServer in server_config.toml.");
+            }
 
+            _inviteBook.BeginRound();
             for (int i = 0; i < connected.Count; i++)
             {
                 ConnectedPlayerInfo player = connected[i];
@@ -552,62 +557,74 @@ namespace Doorman
                     continue;
                 }
 
-                // one decision per connection: the list is checked when somebody connects,
-                // and a later change to the list does not remove a player who is already in
-                string key = player.ClientId.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + player.ConnectTime.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _inviteSeen.Add(key);
-                if (_inviteDecided.TryGetValue(key, out double decidedAt))
+                string key = InviteBook.Key(player.ClientId, player.ConnectTime);
+                if (!_inviteBook.NeedsDecision(key, now))
                 {
-                    // allowed players are stored as -1; a turned-away one still here after 3s is told again
-                    if (decidedAt < 0d || now - decidedAt < 3d)
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
-                InviteVerdict verdict = InviteGate.Decide(_config, new ConnectionIdentity
+                ConnectionIdentity who = Identity(player, serverConfirms);
+                InviteAction action = _inviteBook.Record(key, InviteGate.Decide(_config, who), now);
+                if (action == InviteAction.TellAndDisconnect)
                 {
-                    IsLoopback = player.IsLoopbackConnection,
-                    ConfirmedSteamId = player.AuthenticatedSteamId,
-                    ReportedSteamId = player.SteamId,
-                    ServerConfirmsIdentity = serverConfirms,
-                    JoinFinished = player.HasCompletedJoinFlow
-                });
-
-                if (verdict == InviteVerdict.Allow)
-                {
-                    _inviteDecided[key] = -1d;
-                }
-                else if (verdict == InviteVerdict.TurnAway)
-                {
-                    bool first = !_inviteDecided.ContainsKey(key);
-                    _inviteDecided[key] = now;
-                    players.NotifyAndDisconnectPlayer(player, "Invited players only", _config.InvitedOnlyMessage);
-                    if (first)
+                    if (players.NotifyAndDisconnectPlayer(player, "Invited players only", _config.InvitedOnlyMessage))
                     {
-                        LoggerInstance.Msg("Invited players only: turned away " + player.DisplayName + " (Steam ID " + (string.IsNullOrEmpty(player.TrustedUniqueId) ? "unknown" : player.TrustedUniqueId) + "), not on the list.");
+                        LoggerInstance.Msg("Invited players only: turned away " + DescribeForLog(player, who) + ", not on the list.");
                     }
+                    else
+                    {
+                        // the mod could not send its message or start its timer: they still do not stay
+                        LoggerInstance.Warning("Invited players only: the message to " + DescribeForLog(player, who) + " could not be sent, so the connection is closed without it.");
+                        CloseConnection(player);
+                    }
+                }
+                else if (action == InviteAction.DisconnectNow)
+                {
+                    if (_inviteBook.Tries(key) == 2)
+                    {
+                        LoggerInstance.Warning("Invited players only: " + DescribeForLog(player, who) + " was still connected " + InviteBook.RetrySeconds + " seconds after being turned away, so the connection is closed directly.");
+                    }
+
+                    CloseConnection(player);
                 }
             }
 
-            if (_inviteDecided.Count > _inviteSeen.Count)
-            {
-                List<string> stale = new List<string>();
-                foreach (string key in _inviteDecided.Keys)
-                {
-                    if (!_inviteSeen.Contains(key))
-                    {
-                        stale.Add(key);
-                    }
-                }
-
-                foreach (string key in stale)
-                {
-                    _inviteDecided.Remove(key);
-                }
-            }
-
+            _inviteBook.EndRound();
             return true;
+        }
+
+        // A server the mod's settings cannot be read for counts as one that asks Steam: nobody is taken at their own word.
+        private static bool ServerConfirmsIdentity()
+        {
+            ServerConfig config = ServerConfig.Instance;
+            return config == null || config.AuthenticationEnabled;
+        }
+
+        private static ConnectionIdentity Identity(ConnectedPlayerInfo player, bool serverConfirms)
+        {
+            return new ConnectionIdentity
+            {
+                IsLoopback = player.IsLoopbackConnection,
+                ConfirmedSteamId = player.AuthenticatedSteamId,
+                ReportedSteamId = player.SteamId,
+                ServerConfirmsIdentity = serverConfirms,
+                JoinFinished = player.HasCompletedJoinFlow
+            };
+        }
+
+        private static string DescribeForLog(ConnectedPlayerInfo player, ConnectionIdentity who)
+        {
+            string id = InviteGate.IdToShow(who);
+            return StepHealth.OneLine(player.DisplayName, 64) + " (Steam ID " + (id.Length > 0 ? id : "not confirmed") + ")";
+        }
+
+        private static void CloseConnection(ConnectedPlayerInfo player)
+        {
+            NetworkConnection connection = player.Connection;
+            if (connection != null && connection.IsActive)
+            {
+                connection.Disconnect(true);
+            }
         }
 
         // ---- live feed
@@ -662,6 +679,7 @@ namespace Doorman
             PlayerManager players = S1DS.Server.Players;
             if (players != null)
             {
+                bool serverConfirms = ServerConfirmsIdentity();
                 IReadOnlyList<ConnectedPlayerInfo> connected = players.GetConnectedPlayers();
                 for (int i = 0; i < connected.Count; i++)
                 {
@@ -674,7 +692,7 @@ namespace Doorman
                     FeedPlayer entry = new FeedPlayer
                     {
                         Name = player.DisplayName ?? string.Empty,
-                        SteamId = InviteGate.IsSteamId64(player.TrustedUniqueId) ? player.TrustedUniqueId : string.Empty,
+                        SteamId = InviteGate.IdToShow(Identity(player, serverConfirms)),
                         ConnectedUtc = player.ConnectTime,
                         Joined = player.HasCompletedJoinFlow
                     };

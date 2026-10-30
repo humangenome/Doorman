@@ -28,6 +28,8 @@ internal static class Program
     {
         Settings();
         Invites();
+        Book();
+        Shown();
         Idle();
         Feed();
         Steps();
@@ -177,6 +179,133 @@ internal static class Program
         Check("no Steam check: reported and not invited", InviteGate.Decide(on, new ConnectionIdentity { ReportedSteamId = Other }) == InviteVerdict.TurnAway);
         Check("no Steam check: nothing reported yet", InviteGate.Decide(on, new ConnectionIdentity()) == InviteVerdict.Wait);
         Check("no Steam check: in with nothing reported", InviteGate.Decide(on, new ConnectionIdentity { JoinFinished = true }) == InviteVerdict.TurnAway);
+    }
+
+    // ---- one decision per connection, and nobody not on the list stays
+
+    private static void Book()
+    {
+        InviteBook book = new InviteBook();
+        DateTime when = new DateTime(2026, 10, 30, 20, 0, 0, DateTimeKind.Utc);
+        string a = InviteBook.Key(1, when);
+        string b = InviteBook.Key(2, when);
+
+        Check("book: a connection is its client number and its start time", a != b && a != InviteBook.Key(1, when.AddSeconds(1)) && a == InviteBook.Key(1, when));
+
+        // let in once, never looked at again, whatever the list does later
+        book.BeginRound();
+        Check("book: a new connection needs a decision", book.NeedsDecision(a, 10d));
+        Check("book: let in does nothing to the connection", book.Record(a, InviteVerdict.Allow, 10d) == InviteAction.Nothing);
+        book.EndRound();
+        book.BeginRound();
+        Check("book: let in stays let in, however long it plays", !book.NeedsDecision(a, 100000d));
+        book.EndRound();
+        Check("book: being let in is not being turned away", book.Tries(a) == 0);
+
+        // still in the Steam check: asked again next look, nothing remembered
+        book = new InviteBook();
+        book.BeginRound();
+        Check("book: in the Steam check needs a decision", book.NeedsDecision(b, 10d));
+        Check("book: in the Steam check nothing happens to it", book.Record(b, InviteVerdict.Wait, 10d) == InviteAction.Nothing);
+        Check("book: in the Steam check nothing is remembered", book.Count == 0 && book.Tries(b) == 0);
+        book.EndRound();
+        book.BeginRound();
+        Check("book: still in the Steam check, asked again on the very next look", book.NeedsDecision(b, 10.25d));
+        Check("book: Steam then says it is on the list", book.Record(b, InviteVerdict.Allow, 10.25d) == InviteAction.Nothing);
+        Check("book: and it is in", !book.NeedsDecision(b, 11d));
+        book.EndRound();
+
+        // turned away: told once, then closed directly while it is still there
+        book = new InviteBook();
+        book.BeginRound();
+        Check("away: needs a decision", book.NeedsDecision(a, 20d));
+        Check("away: the first time it is told, then disconnected", book.Record(a, InviteVerdict.TurnAway, 20d) == InviteAction.TellAndDisconnect);
+        Check("away: one try so far", book.Tries(a) == 1);
+        book.EndRound();
+        book.BeginRound();
+        Check("away: gets a moment to go", !book.NeedsDecision(a, 20.25d) && !book.NeedsDecision(a, 22.9d));
+        book.EndRound();
+        book.BeginRound();
+        Check("away: still here after 3 seconds needs a decision again", book.NeedsDecision(a, 23d));
+        Check("away: and this time the connection is closed directly", book.Record(a, InviteVerdict.TurnAway, 23d) == InviteAction.DisconnectNow);
+        Check("away: two tries", book.Tries(a) == 2);
+        book.EndRound();
+        book.BeginRound();
+        Check("away: the next try waits 3 seconds too", !book.NeedsDecision(a, 25.9d) && book.NeedsDecision(a, 26d));
+        Check("away: and closes directly again", book.Record(a, InviteVerdict.TurnAway, 26d) == InviteAction.DisconnectNow && book.Tries(a) == 3);
+        book.EndRound();
+
+        // added to the list while it was being turned away
+        book.BeginRound();
+        Check("away: added to the list in time, looked at again", book.NeedsDecision(a, 29d));
+        Check("away: and let in", book.Record(a, InviteVerdict.Allow, 29d) == InviteAction.Nothing);
+        Check("away: and left alone from then on", !book.NeedsDecision(a, 1000d));
+        book.EndRound();
+
+        // leaving: a connection the look did not see is forgotten, the others are kept
+        book = new InviteBook();
+        book.BeginRound();
+        book.NeedsDecision(a, 30d);
+        book.Record(a, InviteVerdict.Allow, 30d);
+        book.NeedsDecision(b, 30d);
+        book.Record(b, InviteVerdict.TurnAway, 30d);
+        book.EndRound();
+        Check("gone: two remembered", book.Count == 2);
+        book.BeginRound();
+        book.NeedsDecision(a, 31d);
+        book.EndRound();
+        Check("gone: the one that left is forgotten", book.Count == 1 && book.Tries(b) == 0);
+        book.BeginRound();
+        Check("gone: the one that stayed is still let in", !book.NeedsDecision(a, 32d));
+        book.EndRound();
+        book.BeginRound();
+        book.EndRound();
+        Check("gone: nobody connected, nothing remembered", book.Count == 0);
+
+        // the same client number on a new connection is a new decision
+        book = new InviteBook();
+        book.BeginRound();
+        book.NeedsDecision(a, 40d);
+        book.Record(a, InviteVerdict.Allow, 40d);
+        book.EndRound();
+        string again = InviteBook.Key(1, when.AddMinutes(5));
+        book.BeginRound();
+        Check("again: the same number on a new connection needs a decision", book.NeedsDecision(again, 41d));
+        book.EndRound();
+
+        // an empty round after nothing, and the switch going off
+        book = new InviteBook();
+        book.BeginRound();
+        book.EndRound();
+        Check("clear: nothing to do with nothing", book.Count == 0);
+        book.BeginRound();
+        book.NeedsDecision(a, 50d);
+        book.Record(a, InviteVerdict.Allow, 50d);
+        book.Clear();
+        Check("clear: the switch going off forgets everybody", book.Count == 0);
+        book.BeginRound();
+        Check("clear: the next switch-on checks everybody", book.NeedsDecision(a, 51d));
+        book.EndRound();
+    }
+
+    // ---- which Steam ID is shown for a connection
+
+    private static void Shown()
+    {
+        Check("shown: Steam's word", InviteGate.IdToShow(new ConnectionIdentity { ConfirmedSteamId = Invited, ReportedSteamId = Invited, ServerConfirmsIdentity = true }) == Invited);
+        Check("shown: Steam's word over the game's", InviteGate.IdToShow(new ConnectionIdentity { ConfirmedSteamId = Invited, ReportedSteamId = Other, ServerConfirmsIdentity = true }) == Invited);
+        Check("shown: a game's claim during the Steam check is not shown", InviteGate.IdToShow(new ConnectionIdentity { ReportedSteamId = Invited, ServerConfirmsIdentity = true }) == "");
+        Check("shown: nothing yet", InviteGate.IdToShow(new ConnectionIdentity { ServerConfirmsIdentity = true }) == "");
+        Check("shown: a confirmed value that is no Steam ID is not shown", InviteGate.IdToShow(new ConnectionIdentity { ConfirmedSteamId = "ghost_host", ServerConfirmsIdentity = true }) == "");
+        Check("shown: a server that does not ask Steam shows what the game reports", InviteGate.IdToShow(new ConnectionIdentity { ReportedSteamId = Other }) == Other);
+        Check("shown: a server that does not ask Steam, a report that is no Steam ID", InviteGate.IdToShow(new ConnectionIdentity { ReportedSteamId = "12" }) == "");
+
+        // a player's name on its way to the log: their own game chooses it
+        Check("name: an ordinary name is left alone", StepHealth.OneLine("Mick the Dealer", 64) == "Mick the Dealer");
+        Check("name: a line break cannot start a new log line", StepHealth.OneLine("Mick\r\n[Doorman] Ready.", 64) == "Mick [Doorman] Ready.");
+        Check("name: nothing is empty", StepHealth.OneLine(null, 64) == "" && StepHealth.OneLine("", 64) == "");
+        Check("name: only spaces is empty", StepHealth.OneLine(" \t ", 64) == "");
+        Check("name: cut to length", StepHealth.OneLine(new string('a', 200), 64).Length == 64);
     }
 
     // ---- idle saver

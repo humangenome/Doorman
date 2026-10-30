@@ -145,6 +145,21 @@ namespace Doorman.Core
                 text = string.IsNullOrEmpty(type) ? message : type + ": " + message;
             }
 
+            return OneLine(text, MaxDetail);
+        }
+
+        /// <summary>
+        /// Text fit for one log line: no line breaks or other control characters, no runs of spaces,
+        /// not longer than <paramref name="max"/>. A player's name goes through this too: their own
+        /// game chooses it, and a line break in it could fake a line in the log.
+        /// </summary>
+        public static string OneLine(string text, int max)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return string.Empty;
+            }
+
             char[] chars = text.ToCharArray();
             for (int i = 0; i < chars.Length; i++)
             {
@@ -154,13 +169,13 @@ namespace Doorman.Core
                 }
             }
 
-            text = new string(chars).Trim();
-            while (text.Contains("  "))
+            string line = new string(chars).Trim();
+            while (line.Contains("  "))
             {
-                text = text.Replace("  ", " ");
+                line = line.Replace("  ", " ");
             }
 
-            return text.Length > MaxDetail ? text.Substring(0, MaxDetail) : text;
+            return line.Length > max ? line.Substring(0, max) : line;
         }
 
         private static string Count(int n)
