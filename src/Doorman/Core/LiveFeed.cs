@@ -11,7 +11,10 @@ namespace Doorman.Core
     public sealed class FeedPlayer
     {
         public string Name = string.Empty;
+
+        /// <summary>Empty until Steam has confirmed who this is (see <see cref="InviteGate.IdToShow"/>).</summary>
         public string SteamId = string.Empty;
+
         public DateTime ConnectedUtc;
 
         /// <summary>False while the player is still being let in (Steam check, loading).</summary>

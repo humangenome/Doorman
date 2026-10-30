@@ -89,5 +89,19 @@ namespace Doorman.Core
 
             return who.JoinFinished ? InviteVerdict.TurnAway : InviteVerdict.Wait;
         }
+
+        /// <summary>
+        /// The Steam ID to show for a connection, or empty. Steam's word only, on a server that asks
+        /// Steam: until then the player's own game is the only source, and it can claim anybody.
+        /// </summary>
+        public static string IdToShow(ConnectionIdentity who)
+        {
+            if (IsSteamId64(who.ConfirmedSteamId))
+            {
+                return who.ConfirmedSteamId;
+            }
+
+            return !who.ServerConfirmsIdentity && IsSteamId64(who.ReportedSteamId) ? who.ReportedSteamId : string.Empty;
+        }
     }
 }
