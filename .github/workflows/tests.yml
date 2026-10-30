@@ -36,4 +36,15 @@ jobs:
           echo "version $v"
 
       - name: Unit checks
-        run: dotnet run --project tests/Doorman.Tests -c Release
+        run: |
+          set -o pipefail
+          dotnet run --project tests/Doorman.Tests -c Release | tee checks.txt
+
+      # the README states both; each goes stale without anybody noticing otherwise
+      - name: README matches
+        run: |
+          n=$(grep -oP '^OK: \K[0-9]+' checks.txt)
+          v=$(grep -oP 'public const string Version = "\K[^"]+' src/Doorman/DoormanMod.cs)
+          grep -q "covered by $n unit checks" README.md || { echo "::error::README.md does not say $n unit checks"; exit 1; }
+          grep -q "\"addon\":\"$v\"" README.md || { echo "::error::README.md's status file example does not say addon $v"; exit 1; }
+          echo "README: $n unit checks, addon $v"
