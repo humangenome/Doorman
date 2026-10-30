@@ -4,7 +4,7 @@
        No test framework: `dotnet run` prints one line per failure and exits 1 on any. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>10.0</LangVersion>
