@@ -157,7 +157,7 @@ Reports are welcome in [Issues](https://github.com/HumanGenome/Doorman/issues).
 
 ## Building
 
-Needs the .NET 8 SDK (Doorman builds for `net6.0`, the runtime MelonLoader gives IL2CPP mods),
+Needs the .NET 10 SDK (Doorman builds for `net6.0`, the runtime MelonLoader gives IL2CPP mods),
 `zip`, and `strings`.
 
 1. Copy three things from a Schedule I server folder into one folder outside this repository:
