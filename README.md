@@ -121,7 +121,7 @@ To remove it, delete `Mods\Doorman.dll` and restart. `UserData\Doorman.json` and
 
 ## What has been tested
 
-On a dedicated server with nobody on it: Doorman loads next to the mod, the status file follows the game's clock and saves, a save while idle brings the server back to full speed, a settings change applies within 5 seconds without a restart, a stop at 2 frames a second still saves the world first, and a new connection brought the server back to full speed 13 milliseconds after it opened (`tools/ConnectProbe`, below). 208 unit tests cover the settings reader, the whitelist decision, the idle rule, the status file and the log lines.
+On a dedicated server with nobody on it: Doorman loads next to the mod, the status file follows the game's clock and saves, a save while idle brings the server back to full speed, a settings change applies within 5 seconds without a restart, a stop at 2 frames a second still saves the world first, and a new connection brought the server back to full speed 13 milliseconds after it opened (`tools/ConnectProbe`, below). 223 unit tests cover the settings reader, the whitelist decision, the idle rule, the status file and the log lines.
 
 Not tested yet with a real player: a full join with the idle saver on, the whitelist turning away the right player and letting a listed one in, and the positions in the status file. Tell us how it goes in [Issues](https://github.com/HumanGenome/Doorman/issues).
 
