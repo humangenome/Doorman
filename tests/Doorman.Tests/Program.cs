@@ -104,6 +104,10 @@ internal static class Program
         AddonConfig list = AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":[\"" + Invited + "\",\" " + Other + " \",\"" + Invited + "\",\"12345\",\"7656119800000000x\",\"86561198000000001\",null,42,76561198000000003]}}");
         Check("list: spaces trimmed, repeats dropped, a bare number read", list.InvitedSteamIds.Count == 3 && list.InvitedSteamIds.Contains(Other) && list.InvitedSteamIds.Contains("76561198000000003"), list.InvitedSteamIds.Count.ToString());
         Check("list: what was left out is said once", list.Notes.Count == 1 && list.Notes[0].StartsWith("5 entries on the invited list were not a Steam ID"), string.Join("; ", list.Notes));
+        AddonConfig range = AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":[\"76561197960265729\",\"76561200000000001\",76561202255233023,\"76561197960265728\",\"76561202255233024\"]}}");
+        Check("list: newer IDs starting 7656120 and both ends of the range are kept, one past each end is not",
+            range.InvitedSteamIds.Count == 3 && range.InvitedSteamIds.Contains("76561200000000001") && range.InvitedSteamIds.Contains("76561197960265729") && range.InvitedSteamIds.Contains("76561202255233023")
+            && range.Notes.Count == 1 && range.Notes[0].StartsWith("2 entries on the invited list were not a Steam ID"), string.Join(",", range.InvitedSteamIds) + " / " + string.Join("; ", range.Notes));
         Check("list: on with nobody listed is still on (nobody gets in)", AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true}}").InvitedOnlyEnabled);
         Check("list: a list that is not a list is ignored", AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":\"" + Invited + "\"}}").InvitedSteamIds.Count == 0);
 
@@ -149,6 +153,19 @@ internal static class Program
         Check("steam id: empty and null", !InviteGate.IsSteamId64("") && !InviteGate.IsSteamId64(null));
         Check("steam id: other digit shapes", !InviteGate.IsSteamId64("７６５６１１９８０００００００１"));
 
+        // the whole range of personal accounts, not the first digits: new accounts will start 7656120
+        Check("steam id: the lowest (account 1)", InviteGate.IsSteamId64("76561197960265729"));
+        Check("steam id: the first of the IDs starting 7656120", InviteGate.IsSteamId64("76561200000000001"));
+        Check("steam id: the highest (account 4294967295)", InviteGate.IsSteamId64("76561202255233023"));
+        Check("steam id: the ends are the constants", InviteGate.IsSteamId64(InviteGate.LowestSteamId64) && InviteGate.IsSteamId64(InviteGate.HighestSteamId64));
+        Check("steam id: one below the lowest (account 0)", !InviteGate.IsSteamId64("76561197960265728"));
+        Check("steam id: one above the highest", !InviteGate.IsSteamId64("76561202255233024"));
+        Check("steam id: 17 digits far above the range", !InviteGate.IsSteamId64("86561198000000001"));
+        Check("steam id: a leading space", !InviteGate.IsSteamId64(" " + Invited) && !InviteGate.IsSteamId64(" 7656119800000000"));
+        Check("steam id: a trailing space", !InviteGate.IsSteamId64(Invited + " ") && !InviteGate.IsSteamId64("7656119800000000 "));
+        Check("steam id: a trailing newline", !InviteGate.IsSteamId64(Invited + "\n") && !InviteGate.IsSteamId64("7656119800000000\n"));
+        Check("steam id: 17 fullwidth digits", !InviteGate.IsSteamId64("７６５６１１９８０００００００００１"));
+
         AddonConfig on = InvitedOnly(true);
         AddonConfig off = InvitedOnly(false);
 
@@ -173,6 +190,10 @@ internal static class Program
         Check("on: a confirmed ID that is not a Steam ID counts as not confirmed", InviteGate.Decide(on, new ConnectionIdentity { ConfirmedSteamId = "ghost_host", ServerConfirmsIdentity = true }) == InviteVerdict.Wait);
         Check("on: the server's own hidden player is never turned away", InviteGate.Decide(on, new ConnectionIdentity { IsLoopback = true, ServerConfirmsIdentity = true, JoinFinished = true }) == InviteVerdict.Allow);
         Check("on: an empty list turns everybody away", InviteGate.Decide(AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true}}"), confirmedInvited) == InviteVerdict.TurnAway);
+        const string Newer = "76561200000000001";
+        AddonConfig newerOn = AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":[\"" + Newer + "\"]}}");
+        Check("on: an invited player whose ID starts 7656120 is let in", InviteGate.Decide(newerOn, new ConnectionIdentity { ConfirmedSteamId = Newer, ReportedSteamId = Newer, ServerConfirmsIdentity = true }) == InviteVerdict.Allow);
+        Check("on: a player whose ID starts 7656120 and is not on the list is turned away, not left waiting", InviteGate.Decide(on, new ConnectionIdentity { ConfirmedSteamId = Newer, ReportedSteamId = Newer, ServerConfirmsIdentity = true }) == InviteVerdict.TurnAway);
 
         // switched on, a server that does not ask Steam: the reported ID is all there is
         Check("no Steam check: reported and invited", InviteGate.Decide(on, new ConnectionIdentity { ReportedSteamId = Invited }) == InviteVerdict.Allow);
@@ -299,6 +320,7 @@ internal static class Program
         Check("shown: a confirmed value that is no Steam ID is not shown", InviteGate.IdToShow(new ConnectionIdentity { ConfirmedSteamId = "ghost_host", ServerConfirmsIdentity = true }) == "");
         Check("shown: a server that does not ask Steam shows what the game reports", InviteGate.IdToShow(new ConnectionIdentity { ReportedSteamId = Other }) == Other);
         Check("shown: a server that does not ask Steam, a report that is no Steam ID", InviteGate.IdToShow(new ConnectionIdentity { ReportedSteamId = "12" }) == "");
+        Check("shown: a confirmed ID starting 7656120", InviteGate.IdToShow(new ConnectionIdentity { ConfirmedSteamId = "76561200000000001", ServerConfirmsIdentity = true }) == "76561200000000001");
 
         // a player's name on its way to the log: their own game chooses it
         Check("name: an ordinary name is left alone", StepHealth.OneLine("Mick the Dealer", 64) == "Mick the Dealer");
