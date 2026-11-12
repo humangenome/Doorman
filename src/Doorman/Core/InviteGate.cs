@@ -37,10 +37,20 @@ namespace Doorman.Core
     /// </summary>
     public static class InviteGate
     {
-        /// <summary>A Steam ID as the mod writes it: 17 digits starting 7656119.</summary>
+        /// <summary>The lowest personal Steam ID (account 1).</summary>
+        public const string LowestSteamId64 = "76561197960265729";
+
+        /// <summary>The highest personal Steam ID (account 4294967295).</summary>
+        public const string HighestSteamId64 = "76561202255233023";
+
+        /// <summary>
+        /// A personal Steam account's ID as the mod writes it: exactly 17 ASCII digits, from
+        /// 76561197960265729 to 76561202255233023. Today's IDs all start 7656119; newer accounts
+        /// will start 7656120, so the check is the whole range, not the first digits.
+        /// </summary>
         public static bool IsSteamId64(string value)
         {
-            if (value == null || value.Length != 17 || !value.StartsWith("7656119", System.StringComparison.Ordinal))
+            if (value == null || value.Length != 17)
             {
                 return false;
             }
@@ -53,7 +63,9 @@ namespace Doorman.Core
                 }
             }
 
-            return true;
+            // Same length, digits only: comparing the text is comparing the numbers.
+            return string.CompareOrdinal(value, LowestSteamId64) >= 0
+                && string.CompareOrdinal(value, HighestSteamId64) <= 0;
         }
 
         public static InviteVerdict Decide(AddonConfig config, ConnectionIdentity who)
