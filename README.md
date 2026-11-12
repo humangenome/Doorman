@@ -119,7 +119,7 @@ To remove it, delete `Mods\Doorman.dll` and restart. `UserData\Doorman.json` and
 
 ## What has been tested
 
-On a dedicated server with nobody on it: the add-on loads cleanly next to the mod, the status file follows the game's clock and saves, a save at idle brings the server back to full speed, a setting change applies within 5 seconds without a restart, a stop at 2 frames a second still saves the world first, and a network-level connection brought the server back to full speed 13 milliseconds after it opened (`tools/ConnectProbe`, below). The settings reader, the whitelist decision, the idle rule, the status file and the failure lines are covered by 208 unit checks.
+On a dedicated server with nobody on it: the add-on loads cleanly next to the mod, the status file follows the game's clock and saves, a save at idle brings the server back to full speed, a setting change applies within 5 seconds without a restart, a stop at 2 frames a second still saves the world first, and a network-level connection brought the server back to full speed 13 milliseconds after it opened (`tools/ConnectProbe`, below). The settings reader, the whitelist decision, the idle rule, the status file and the failure lines are covered by 223 unit checks.
 
 Not yet tested with a real player joining: a full join with the idle saver on, the whitelist turning the right person away and letting an invited one in, and the positions in the status file. Reports are welcome in [Issues](https://github.com/HumanGenome/Doorman/issues).
 
