@@ -116,7 +116,7 @@ To remove it, delete `Mods\Doorman.dll` and restart. `UserData\Doorman.json` and
 | `liveFeed.enabled` | On |
 | `liveFeed.intervalSeconds` | 5, from 2 to 60 seconds |
 | `invitedOnly.enabled` | Off. With nobody on the list it turns everybody away |
-| `invitedOnly.steamIds` | Empty. At most 500, each 17 digits starting 7656119 |
+| `invitedOnly.steamIds` | Empty. At most 500, each a 17-digit Steam ID (SteamID64) |
 | `invitedOnly.message` | See [Whitelist](#whitelist). One line of at most 200 characters |
 
 ## What has been tested
