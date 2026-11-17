@@ -20,7 +20,7 @@ namespace Doorman.Core
         public const int MaxFeedIntervalSeconds = 60;
         public const int MaxInvited = 500;
         public const string DefaultInvitedOnlyMessage =
-            "This server is for invited players only. Ask the owner to add your Steam ID to the invited list.";
+            "Ask the server owner to add your Steam ID to the whitelist.";
 
         /// <summary>Lower the frame rate while nobody is connected. Ships OFF.</summary>
         public bool IdleSaverEnabled { get; private set; }
@@ -132,7 +132,7 @@ namespace Doorman.Core
 
                         if (dropped > 0)
                         {
-                            config.Notes.Add(dropped + " entr" + (dropped == 1 ? "y" : "ies") + " on the invited list " + (dropped == 1 ? "was" : "were") + " not a Steam ID (17 digits) or went past the limit of " + MaxInvited + ", and " + (dropped == 1 ? "was" : "were") + " left out");
+                            config.Notes.Add(dropped + " entr" + (dropped == 1 ? "y" : "ies") + " on the whitelist " + (dropped == 1 ? "wasn't" : "weren't") + " a Steam ID (17 digits) or went past the limit of " + MaxInvited + ", and " + (dropped == 1 ? "was" : "were") + " left out");
                         }
                     }
 
@@ -154,8 +154,8 @@ namespace Doorman.Core
         public string Describe()
         {
             return "idle saver " + (IdleSaverEnabled ? "ON (" + IdleFrameRate + " frames a second when empty, after " + IdleGraceSeconds + "s)" : "off")
-                + ", live feed " + (LiveFeedEnabled ? "ON (every " + LiveFeedIntervalSeconds + "s)" : "off")
-                + ", invited players only " + (InvitedOnlyEnabled ? "ON (" + InvitedSteamIds.Count + " on the list)" : "off");
+                + ", status file " + (LiveFeedEnabled ? "ON (every " + LiveFeedIntervalSeconds + "s)" : "off")
+                + ", whitelist " + (InvitedOnlyEnabled ? "ON (" + InvitedSteamIds.Count + " on the list)" : "off");
         }
 
         /// <summary>True when two settings objects would make the add-on behave the same.</summary>

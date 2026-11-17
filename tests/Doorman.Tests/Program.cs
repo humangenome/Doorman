@@ -74,8 +74,8 @@ internal static class Program
         AddonConfig plain = AddonConfig.Parse("{\"version\":1,\"idleSaver\":{\"enabled\":false,\"frameRate\":10,\"graceSeconds\":15},\"liveFeed\":{\"enabled\":true,\"intervalSeconds\":5},\"invitedOnly\":{\"enabled\":false,\"steamIds\":[]}}");
         Check("file with the defaults: the same as no file at all", plain.Readable && plain.SameAs(d) && plain.Notes.Count == 0);
         Check("full file: no notes", p.Notes.Count == 0, string.Join("; ", p.Notes));
-        Check("describe: says what is on", p.Describe() == "idle saver ON (10 frames a second when empty, after 15s), live feed ON (every 5s), invited players only ON (2 on the list)", p.Describe());
-        Check("describe: says what is off", d.Describe() == "idle saver off, live feed ON (every 5s), invited players only off", d.Describe());
+        Check("describe: says what is on", p.Describe() == "idle saver ON (10 frames a second when empty, after 15s), status file ON (every 5s), whitelist ON (2 on the list)", p.Describe());
+        Check("describe: says what is off", d.Describe() == "idle saver off, status file ON (every 5s), whitelist off", d.Describe());
 
         // a switch is on only when the file really says so
         Check("switch: the word on", AddonConfig.Parse("{\"idleSaver\":{\"enabled\":\"on\"}}").IdleSaverEnabled);
@@ -103,11 +103,11 @@ internal static class Program
         // the list takes Steam IDs only
         AddonConfig list = AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":[\"" + Invited + "\",\" " + Other + " \",\"" + Invited + "\",\"12345\",\"7656119800000000x\",\"86561198000000001\",null,42,76561198000000003]}}");
         Check("list: spaces trimmed, repeats dropped, a bare number read", list.InvitedSteamIds.Count == 3 && list.InvitedSteamIds.Contains(Other) && list.InvitedSteamIds.Contains("76561198000000003"), list.InvitedSteamIds.Count.ToString());
-        Check("list: what was left out is said once", list.Notes.Count == 1 && list.Notes[0].StartsWith("5 entries on the invited list were not a Steam ID"), string.Join("; ", list.Notes));
+        Check("list: what was left out is said once", list.Notes.Count == 1 && list.Notes[0].StartsWith("5 entries on the whitelist weren't a Steam ID"), string.Join("; ", list.Notes));
         AddonConfig range = AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":[\"76561197960265729\",\"76561200000000001\",76561202255233023,\"76561197960265728\",\"76561202255233024\"]}}");
         Check("list: newer IDs starting 7656120 and both ends of the range are kept, one past each end is not",
             range.InvitedSteamIds.Count == 3 && range.InvitedSteamIds.Contains("76561200000000001") && range.InvitedSteamIds.Contains("76561197960265729") && range.InvitedSteamIds.Contains("76561202255233023")
-            && range.Notes.Count == 1 && range.Notes[0].StartsWith("2 entries on the invited list were not a Steam ID"), string.Join(",", range.InvitedSteamIds) + " / " + string.Join("; ", range.Notes));
+            && range.Notes.Count == 1 && range.Notes[0].StartsWith("2 entries on the whitelist weren't a Steam ID"), string.Join(",", range.InvitedSteamIds) + " / " + string.Join("; ", range.Notes));
         Check("list: on with nobody listed is still on (nobody gets in)", AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true}}").InvitedOnlyEnabled);
         Check("list: a list that is not a list is ignored", AddonConfig.Parse("{\"invitedOnly\":{\"enabled\":true,\"steamIds\":\"" + Invited + "\"}}").InvitedSteamIds.Count == 0);
 
@@ -116,7 +116,7 @@ internal static class Program
         Check("message: one clean line", msg.InvitedOnlyMessage == "line one line two !", msg.InvitedOnlyMessage);
         Check("message: empty keeps the default", AddonConfig.Parse("{\"invitedOnly\":{\"message\":\"   \"}}").InvitedOnlyMessage == AddonConfig.DefaultInvitedOnlyMessage);
         Check("message: never longer than 200", AddonConfig.Parse("{\"invitedOnly\":{\"message\":\"" + new string('a', 500) + "\"}}").InvitedOnlyMessage.Length == 200);
-        Check("message: the default is plain and names no hardware or supplier", AddonConfig.DefaultInvitedOnlyMessage == "This server is for invited players only. Ask the owner to add your Steam ID to the invited list.");
+        Check("message: the default is plain and names no hardware or supplier", AddonConfig.DefaultInvitedOnlyMessage == "Ask the server owner to add your Steam ID to the whitelist.");
 
         // a file that is not a settings file is refused, so good settings in use are kept
         foreach (string bad in new[] { "", "   ", "not json", "{\"idleSaver\":{\"enabled\":true}", "[1,2]", "\"text\"", "null" })
@@ -564,7 +564,7 @@ internal static class Program
     private static void Steps()
     {
         double t = 0d;
-        StepHealth step = new StepHealth("invite check", () => t);
+        StepHealth step = new StepHealth("whitelist check", () => t);
 
         Check("step: a step that never failed says nothing when it works", step.Succeeded() == null && !step.Failing);
         Check("step: worked just now", step.WorkedWithin(5d));
@@ -573,7 +573,7 @@ internal static class Program
         step.Succeeded();
 
         string first = step.Failed(new InvalidOperationException("Clients is gone"));
-        Check("step: the first failure is said at once, with the exception", first == "Invite check failed, and is tried again each time: InvalidOperationException: Clients is gone.", first);
+        Check("step: the first failure is said at once, with the exception", first == "Whitelist check failed, and is tried again each time: InvalidOperationException: Clients is gone.", first);
         Check("step: failing, so not working within any window", step.Failing && !step.WorkedWithin(1000d) && step.FailuresInARow == 1);
 
         // the same failure four times a second for almost five minutes: no more lines
@@ -590,7 +590,7 @@ internal static class Program
         Check("step: the same failure again is only counted", lines == 0 && step.FailuresInARow == 1199, lines.ToString());
         t = 306d;
         string again = step.Failed(new InvalidOperationException("Clients is gone"));
-        Check("step: five minutes on it is said again, with a count", again == "Invite check is still failing (1198 failures since the last line): InvalidOperationException: Clients is gone.", again);
+        Check("step: five minutes on it is said again, with a count", again == "Whitelist check is still failing (1198 failures since the last line): InvalidOperationException: Clients is gone.", again);
         t = 307d;
         Check("step: and then quiet again", step.Failed(new InvalidOperationException("Clients is gone")) == null);
 
@@ -599,19 +599,19 @@ internal static class Program
         Check("step: a new kind inside 10 seconds of the last line waits", step.Failed(new NullReferenceException("Object reference not set")) == null);
         t = 316.5d;
         string newer = step.Failed(new NullReferenceException("Object reference not set"));
-        Check("step: a new kind is said once the 10 seconds are up", newer == "Invite check failed in a new way (2 failures since the last line): NullReferenceException: Object reference not set.", newer);
+        Check("step: a new kind is said once the 10 seconds are up", newer == "Whitelist check failed in a new way (2 failures since the last line): NullReferenceException: Object reference not set.", newer);
         t = 330d;
         Check("step: flipping back to a kind already said is only counted", step.Failed(new InvalidOperationException("Clients is gone")) == null && step.Failed(new NullReferenceException("Object reference not set")) == null);
 
         // works again
         t = 331d;
         string back = step.Succeeded();
-        Check("step: one line when it works again", back == "Invite check is working again after 1205 failures.", back);
+        Check("step: one line when it works again", back == "Whitelist check is working again after 1205 failures.", back);
         Check("step: and it is working", !step.Failing && step.FailuresInARow == 0 && step.WorkedWithin(5d));
         Check("step: no second working line", step.Succeeded() == null);
         t = 332d;
         string relapse = step.Failed(new InvalidOperationException("Clients is gone"));
-        Check("step: after working, the old failure is a first failure again", relapse != null && relapse.StartsWith("Invite check failed, and is tried again each time: "), relapse);
+        Check("step: after working, the old failure is a first failure again", relapse != null && relapse.StartsWith("Whitelist check failed, and is tried again each time: "), relapse);
         step.Succeeded();
 
         // a message that changes every time (an index, a name) cannot fill the log
@@ -630,17 +630,17 @@ internal static class Program
         Check("step: and still at least the first", noisyLines >= 1);
 
         // what a line carries
-        StepHealth plain = new StepHealth("writing the live feed file", () => t);
+        StepHealth plain = new StepHealth("writing the status file", () => t);
         string reason = plain.Failed(null, "Doorman.live.json could not be written five times in a row");
-        Check("step: a plain reason without an exception type", reason == "Writing the live feed file failed, and is tried again each time: Doorman.live.json could not be written five times in a row.", reason);
+        Check("step: a plain reason without an exception type", reason == "Writing the status file failed, and is tried again each time: Doorman.live.json could not be written five times in a row.", reason);
         plain.Succeeded();
         string odd = plain.Failed("IOException", "line one\nline two\t\r  end");
-        Check("step: one line, whatever the message holds", odd == "Writing the live feed file failed, and is tried again each time: IOException: line one line two end.", odd);
+        Check("step: one line, whatever the message holds", odd == "Writing the status file failed, and is tried again each time: IOException: line one line two end.", odd);
         plain.Succeeded();
         string longOne = plain.Failed("IOException", new string('x', 1000));
         Check("step: a long message is cut", longOne.Length < StepHealth.MaxDetail + 100, longOne.Length.ToString());
         plain.Succeeded();
-        Check("step: nothing at all to say still says something", plain.Failed((Exception)null) == "Writing the live feed file failed, and is tried again each time: no reason given.");
+        Check("step: nothing at all to say still says something", plain.Failed((Exception)null) == "Writing the status file failed, and is tried again each time: no reason given.");
         bool threw = false;
         try { new StepHealth("x", null); } catch (ArgumentNullException) { threw = true; }
         Check("step: a missing clock is refused", threw);
