@@ -27,7 +27,7 @@ Each one has its own switch in the settings file. Doorman never gives items or c
 
 ### Whitelist
 
-Off until you turn it on. A list of Steam IDs: a player who is not on it is disconnected with a message you can set. The default message is "This server is for invited players only. Ask the owner to add your Steam ID to the invited list."
+Off until you turn it on. A player whose Steam ID isn't on the whitelist is disconnected and sees "Not on the whitelist" with a message you can set. The default message is "Ask the server owner to add your Steam ID to the whitelist."
 
 Only the ID that Steam confirmed counts, never the one the player's own game reports. That needs the mod's Steam authentication, which is on unless you changed it in `server_config.toml`:
 
@@ -93,7 +93,7 @@ You need a Schedule I dedicated server on S1DedicatedServers **1.1.6**, the IL2C
 3. Restart the server. The log (`MelonLoader\Latest.log`) shows, after the mod's `DEDICATED SERVER READY` line:
 
    ```
-   [Doorman] Ready. idle saver off, live feed ON (every 5s), invited players only off.
+   [Doorman] Ready. idle saver off, status file ON (every 5s), whitelist off.
    ```
 
 To remove it, delete `Mods\Doorman.dll` and restart. `UserData\Doorman.json` and `UserData\Doorman.live.json` can go too.

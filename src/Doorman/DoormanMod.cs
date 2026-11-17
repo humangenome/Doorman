@@ -39,7 +39,7 @@ namespace Doorman
         // (it runs four times a second, and always before the feed in the same frame)
         private const double InviteCheckingWindowSeconds = 5d;
 
-        private const string InviteNote = " Until it works again nobody who joins is checked against the invited list, and the live feed says so.";
+        private const string InviteNote = " Until it works again, nobody who joins is checked against the whitelist, and the status file says so.";
 
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private readonly Stopwatch _frame = Stopwatch.StartNew();
@@ -82,9 +82,9 @@ namespace Doorman
             _idle = new IdlePolicy(now);
             _settingsStep = new StepHealth("settings check", now);
             _countStep = new StepHealth("player count", now);
-            _inviteStep = new StepHealth("invite check", now);
-            _feedStep = new StepHealth("live feed", now);
-            _feedFileStep = new StepHealth("writing the live feed file", now);
+            _inviteStep = new StepHealth("whitelist check", now);
+            _feedStep = new StepHealth("status file", now);
+            _feedFileStep = new StepHealth("writing the status file", now);
             _settingsPath = Path.Combine(MelonEnvironment.UserDataDirectory, SettingsFileName);
             _feedPath = Path.Combine(MelonEnvironment.UserDataDirectory, FeedFileName);
             LoadSettings(true);
@@ -545,7 +545,7 @@ namespace Doorman
             if (!serverConfirms && !_saidNoSteamCheck)
             {
                 _saidNoSteamCheck = true;
-                LoggerInstance.Warning("Invited players only: the mod's Steam authentication is off, so the list can only go by the ID a player's own game reports, and a player can fake that. Set authProvider to SteamGameServer in server_config.toml.");
+                LoggerInstance.Warning("Whitelist: the mod's Steam authentication is off, so the whitelist can only go by the ID a player's own game reports, and a player can fake that. Set authProvider to SteamGameServer in server_config.toml.");
             }
 
             _inviteBook.BeginRound();
@@ -567,14 +567,14 @@ namespace Doorman
                 InviteAction action = _inviteBook.Record(key, InviteGate.Decide(_config, who), now);
                 if (action == InviteAction.TellAndDisconnect)
                 {
-                    if (players.NotifyAndDisconnectPlayer(player, "Invited players only", _config.InvitedOnlyMessage))
+                    if (players.NotifyAndDisconnectPlayer(player, "Not on the whitelist", _config.InvitedOnlyMessage))
                     {
-                        LoggerInstance.Msg("Invited players only: turned away " + DescribeForLog(player, who) + ", not on the list.");
+                        LoggerInstance.Msg("Whitelist: turned away " + DescribeForLog(player, who) + ", not on the whitelist.");
                     }
                     else
                     {
                         // the mod could not send its message or start its timer: they still do not stay
-                        LoggerInstance.Warning("Invited players only: the message to " + DescribeForLog(player, who) + " could not be sent, so the connection is closed without it.");
+                        LoggerInstance.Warning("Whitelist: couldn't send the message to " + DescribeForLog(player, who) + ", so they were disconnected without it.");
                         CloseConnection(player);
                     }
                 }
@@ -582,7 +582,7 @@ namespace Doorman
                 {
                     if (_inviteBook.Tries(key) == 2)
                     {
-                        LoggerInstance.Warning("Invited players only: " + DescribeForLog(player, who) + " was still connected " + InviteBook.RetrySeconds + " seconds after being turned away, so the connection is closed directly.");
+                        LoggerInstance.Warning("Whitelist: " + DescribeForLog(player, who) + " was still connected " + InviteBook.RetrySeconds + " seconds after being turned away, so they were disconnected.");
                     }
 
                     CloseConnection(player);
