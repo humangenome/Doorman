@@ -60,7 +60,7 @@ The details: [How the idle saver works](docs/how-it-works.md).
 On unless you turn it off. Every 5 seconds (you can set another interval) Doorman rewrites `UserData\Doorman.live.json`, one line of JSON: the in-game day and time, the last save time, and each connected player's name, Steam ID, time connected and position on the map (x, z). It opens no port and the file never grows. If its `written` time is older than about three intervals, treat the server as not running.
 
 ```json
-{"format":1,"addon":"1.0.4","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
+{"format":1,"addon":"1.0.5","written":"2026-10-09T18:38:08Z","writtenUnix":1791571088,
  "ready":"2026-10-09T18:36:17Z",
  "clock":{"available":true,"day":1,"hour":7,"minute":0,"time":"07:00"},
  "lastSave":{"files":"2026-10-09T18:35:58Z","reported":null},
